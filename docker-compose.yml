@@ -1,75 +1,24 @@
-# Example deployment for a NAS (UGREEN UGOS, Synology, ...) that already runs a media
-# stack. Only the bot service is defined here — Prowlarr, FlareSolverr, qBittorrent and
-# Plex are assumed to exist already; the bot just needs to share a Docker network with
-# Prowlarr and qBittorrent so it can reach them by container name.
-#
-# 1. Find the network your media stack uses:        docker network ls
-# 2. Adjust the `networks` section below accordingly.
-# 3. Fill in the environment variables (or use an .env file next to this compose file).
-# 4. docker compose up -d
-
 services:
-  cineseekerr:
-    # Use the prebuilt image...
-    image: ghcr.io/emanuele-patruno/cineseekerr:latest
-    # ...or build from source instead:
-    # build: .
-    container_name: cineseekerr
+  cineseekerr-arr:
+    build: .
+    image: cineseekerr-arr:local
+    container_name: cineseekerr-arr
     restart: unless-stopped
     environment:
-      # Language of the bot's Telegram messages: "en" (default) or "it".
-      BOT_LANGUAGE: "en"
-
-      # --- Telegram ---
-      # Token from @BotFather
-      TELEGRAM_BOT_TOKEN: "123456789:AAF..."
-      # Comma-separated chat IDs allowed to use the bot (get yours from @userinfobot).
-      # Everyone else is silently ignored.
-      TELEGRAM_ALLOWED_CHAT_IDS: "123456789"
-
-      # --- TMDB (movie disambiguation) ---
-      # Either a v3 API key or a v4 Read Access Token, both work.
-      TMDB_API_KEY: "..."
-      # Language for titles/plots shown in chat; follows BOT_LANGUAGE if left unset.
-      # TMDB_LANGUAGE: "it-IT"
-
-      # --- Prowlarr (indexer search) ---
-      # Container name + internal port, NOT the NAS IP: the bot talks over the
-      # shared Docker network.
-      PROWLARR_URL: "http://prowlarr:9696"
-      # Prowlarr → Settings → General → API Key
-      PROWLARR_API_KEY: "..."
-
-      # --- qBittorrent (download) ---
-      QBITTORRENT_URL: "http://qbittorrent:8080"
-      QBITTORRENT_USER: "admin"
-      QBITTORRENT_PASS: "..."
-
-      # --- Media ---
-      # Save paths AS SEEN BY THE QBITTORRENT CONTAINER — pick the folders your Plex
-      # libraries point at. The bot never touches the filesystem itself (renames go
-      # through the qBittorrent API), so no volume mount is needed here.
-      MEDIA_ROOT_FOLDER: "/media/Movies"
-      # TV seasons are saved under "<tv-root>/Show (Year)/Season NN"
-      MEDIA_TV_ROOT_FOLDER: "/media/TV"
-
-      # How often to poll qBittorrent for completed downloads (ISO-8601, default PT30S)
-      # DOWNLOAD_POLL_INTERVAL: "PT30S"
-    volumes:
-      # Keeps track of in-flight downloads across restarts (see the "data" volume below).
-      - data:/data
-    networks:
-      - media
-
-volumes:
-  # Small JSON file with the downloads the bot is still waiting on. Without this volume
-  # a restart mid-download loses track of the pending Plex rename (the download itself
-  # is unaffected, only the automatic rename/notification).
-  data:
-
+      BOT_LANGUAGE: "it"
+      TELEGRAM_BOT_TOKEN: "${TELEGRAM_BOT_TOKEN:?set in .env}"
+      TELEGRAM_ALLOWED_CHAT_IDS: "${TELEGRAM_ALLOWED_CHAT_IDS:?set in .env}"
+      TMDB_API_KEY: "${TMDB_API_KEY:?set in .env}"
+      RADARR_URL: "http://radarr:7878"
+      RADARR_API_KEY: "${RADARR_API_KEY:?set in .env}"
+      RADARR_QUALITY_PROFILE_ID: "${RADARR_QUALITY_PROFILE_ID:?set in .env}"
+      RADARR_ROOT_FOLDER: "${RADARR_ROOT_FOLDER:?set in .env}"
+      SONARR_URL: "http://sonarr:8989"
+      SONARR_API_KEY: "${SONARR_API_KEY:?set in .env}"
+      SONARR_QUALITY_PROFILE_ID: "${SONARR_QUALITY_PROFILE_ID:?set in .env}"
+      SONARR_ROOT_FOLDER: "${SONARR_ROOT_FOLDER:?set in .env}"
+    networks: [media]
 networks:
-  # The pre-existing network shared with Prowlarr/qBittorrent. If your stack was
-  # created by another compose project, mark it external and use its real name
-  # (e.g. "mediastack_default").
   media:
     external: true
+    name: "${ARR_NETWORK:?set to your existing Arr Docker network}"

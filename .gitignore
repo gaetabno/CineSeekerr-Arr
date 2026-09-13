@@ -18,6 +18,9 @@ Thumbs.db
 .env
 *.local.yml
 
+# Local agent notes and plans
+.hermes/
+
 # Local run artifacts (scripts/run-local.ps1 output, pending-downloads state file)
 local-run*.log
 /data/

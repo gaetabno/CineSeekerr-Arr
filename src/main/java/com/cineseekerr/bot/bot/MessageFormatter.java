@@ -3,7 +3,6 @@ package com.cineseekerr.bot.bot;
 import com.cineseekerr.bot.bot.state.ConversationState;
 import com.cineseekerr.bot.model.Language;
 import com.cineseekerr.bot.model.ParsedRelease;
-import com.cineseekerr.bot.model.QbtTorrent;
 import com.cineseekerr.bot.model.ReleaseSource;
 import com.cineseekerr.bot.model.Resolution;
 import com.cineseekerr.bot.model.SearchResult;
@@ -156,16 +155,6 @@ public class MessageFormatter {
         return sb.toString();
     }
 
-    String torrentStatusLine(QbtTorrent torrent) {
-        String name = truncate(torrent.name(), 60);
-        if (torrent.isComplete()) {
-            return messages.get("status.line.done", esc(name));
-        }
-        int percent = (int) Math.floor(torrent.progress() * 100);
-        long speed = torrent.dlspeed() == null ? 0 : torrent.dlspeed();
-        return messages.get("status.line.progress", esc(name), String.valueOf(percent),
-                humanSize(speed), humanEta(torrent.eta()));
-    }
 
     static String humanSize(long bytes) {
         if (bytes >= 1L << 30) {
@@ -185,18 +174,6 @@ public class MessageFormatter {
         return hours > 0 ? hours + "h " + minutes + "m" : minutes + "m";
     }
 
-    /** qBittorrent reports 8640000 seconds when the ETA is unknown. */
-    static String humanEta(Long etaSeconds) {
-        if (etaSeconds == null || etaSeconds >= 8_640_000L || etaSeconds < 0) {
-            return "?";
-        }
-        long hours = etaSeconds / 3600;
-        long minutes = (etaSeconds % 3600) / 60;
-        if (hours > 0) {
-            return hours + "h " + minutes + "m";
-        }
-        return minutes > 0 ? minutes + "m" : etaSeconds + "s";
-    }
 
     static String truncate(String text, int maxLength) {
         if (text == null) {
