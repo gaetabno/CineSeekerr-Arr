@@ -2,6 +2,8 @@ package com.cineseekerr.bot.client;
 
 import com.cineseekerr.bot.config.CineSeekerrProperties;
 import com.cineseekerr.bot.model.ArrMovie;
+import com.cineseekerr.bot.model.ArrQueueItem;
+import com.cineseekerr.bot.model.ArrQueueResponse;
 import com.cineseekerr.bot.model.ArrRelease;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
@@ -63,6 +65,18 @@ public class RadarrClient {
             return releases == null ? List.of() : releases;
         } catch (RestClientException e) {
             throw new ApiClientException("Ricerca manuale Radarr fallita", e);
+        }
+    }
+
+    /** Returns active downloads and imports currently tracked by Radarr. */
+    public List<ArrQueueItem> queue() {
+        try {
+            ArrQueueResponse page = client.get().uri(b -> b.path("/api/v3/queue")
+                            .queryParam("page", 1).queryParam("pageSize", 100).build())
+                    .retrieve().body(ArrQueueResponse.class);
+            return page == null ? List.of() : page.recordsOrEmpty();
+        } catch (RestClientException e) {
+            throw new ApiClientException("Impossibile leggere la coda Radarr", e);
         }
     }
 
