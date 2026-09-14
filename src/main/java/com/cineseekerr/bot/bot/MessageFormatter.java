@@ -1,6 +1,7 @@
 package com.cineseekerr.bot.bot;
 
 import com.cineseekerr.bot.bot.state.ConversationState;
+import com.cineseekerr.bot.model.ArrQueueItem;
 import com.cineseekerr.bot.model.Language;
 import com.cineseekerr.bot.model.ParsedRelease;
 import com.cineseekerr.bot.model.ReleaseSource;
@@ -155,6 +156,46 @@ public class MessageFormatter {
         return sb.toString();
     }
 
+
+    String statusText(List<ArrQueueItem> radarrQueue, List<ArrQueueItem> sonarrQueue) {
+        List<QueueLine> items = new ArrayList<>();
+        radarrQueue.forEach(item -> items.add(new QueueLine("🎬 Radarr", item)));
+        sonarrQueue.forEach(item -> items.add(new QueueLine("📺 Sonarr", item)));
+        if (items.isEmpty()) {
+            return messages.get("status.none");
+        }
+
+        StringBuilder sb = new StringBuilder(messages.get("status.header"));
+        for (QueueLine line : items.stream().limit(20).toList()) {
+            ArrQueueItem item = line.item();
+            long total = item.sizeOrZero();
+            long left = Math.min(Math.max(0, item.sizeLeftOrZero()), total);
+            long completed = Math.max(0, total - left);
+            int percent = total == 0 ? 0 : (int) Math.round(completed * 100.0 / total);
+            sb.append("\n\n").append(line.source()).append(" <b>")
+                    .append(esc(truncate(item.title(), 80))).append("</b>")
+                    .append("\n⬇️ ").append(percent).append("% · ")
+                    .append(humanSize(left)).append(" rimanenti");
+            if (total > 0) {
+                sb.append(" / ").append(humanSize(total));
+            }
+            if (item.timeleft() != null && !item.timeleft().isBlank()) {
+                sb.append(" · ETA ").append(esc(item.timeleft()));
+            }
+            String state = item.status();
+            if (state == null || state.isBlank()) state = item.trackedDownloadStatus();
+            if (state != null && !state.isBlank()) {
+                sb.append("\n<i>").append(esc(state)).append("</i>");
+            }
+            if (item.errorMessage() != null && !item.errorMessage().isBlank()) {
+                sb.append("\n⚠️ ").append(esc(truncate(item.errorMessage(), 140)));
+            }
+        }
+        if (items.size() > 20) sb.append("\n\n… +").append(items.size() - 20).append(" elementi");
+        return sb.toString();
+    }
+
+    private record QueueLine(String source, ArrQueueItem item) { }
 
     static String humanSize(long bytes) {
         if (bytes >= 1L << 30) {
