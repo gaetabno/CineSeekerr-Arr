@@ -2,6 +2,8 @@ package com.cineseekerr.bot.client;
 
 import com.cineseekerr.bot.config.CineSeekerrProperties;
 import com.cineseekerr.bot.model.ArrEpisode;
+import com.cineseekerr.bot.model.ArrQueueItem;
+import com.cineseekerr.bot.model.ArrQueueResponse;
 import com.cineseekerr.bot.model.ArrRelease;
 import com.cineseekerr.bot.model.ArrSeries;
 import org.springframework.core.ParameterizedTypeReference;
@@ -72,6 +74,18 @@ public class SonarrClient {
             return releases(b -> b.path("/api/v3/release").queryParam("episodeId", episodeId).build());
         } catch (RestClientException e) {
             throw new ApiClientException("Ricerca manuale Sonarr fallita", e);
+        }
+    }
+
+    /** Returns active downloads and imports currently tracked by Sonarr. */
+    public List<ArrQueueItem> queue() {
+        try {
+            ArrQueueResponse page = client.get().uri(b -> b.path("/api/v3/queue")
+                            .queryParam("page", 1).queryParam("pageSize", 100).build())
+                    .retrieve().body(ArrQueueResponse.class);
+            return page == null ? List.of() : page.recordsOrEmpty();
+        } catch (RestClientException e) {
+            throw new ApiClientException("Impossibile leggere la coda Sonarr", e);
         }
     }
 
