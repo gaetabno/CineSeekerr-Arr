@@ -13,7 +13,7 @@ RUN mvn -B -q package -DskipTests
 # ---------- Runtime stage ----------
 FROM eclipse-temurin:21-jre-alpine
 RUN addgroup -S cineseekerr && adduser -S cineseekerr -G cineseekerr
-# The bot has no download or media mounts: Radarr/Sonarr own Transmission and library imports.
+# No download/media mounts: cleanup uses only authenticated Transmission RPC.
 USER cineseekerr
 WORKDIR /app
 

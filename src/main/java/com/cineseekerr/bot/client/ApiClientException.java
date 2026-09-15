@@ -1,7 +1,7 @@
 package com.cineseekerr.bot.client;
 
 /**
- * Raised when a call to an external service (TMDB, Prowlarr, qBittorrent) fails.
+ * Raised when a call to an external service (TMDB, Arr or Transmission) fails.
  * The message is safe to surface to the Telegram user; the cause carries the details
  * for the logs.
  */

@@ -50,10 +50,10 @@ public class CineSeekerrBot implements LongPollingSingleThreadUpdateConsumer {
         }
         try {
             if (update.hasMessage() && update.getMessage().hasText()) {
-                handler.onTextMessage(chatId, update.getMessage().getText());
+                handler.onTextMessage(chatId, update.getMessage().getFrom().getId(), update.getMessage().getText());
             } else if (update.hasCallbackQuery()) {
                 CallbackQuery callback = update.getCallbackQuery();
-                handler.onCallback(chatId, callback.getMessage().getMessageId(),
+                handler.onCallback(chatId, callback.getFrom().getId(), callback.getMessage().getMessageId(),
                         callback.getId(), callback.getData());
             }
         } catch (RuntimeException e) {

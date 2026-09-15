@@ -17,6 +17,10 @@ services:
       SONARR_API_KEY: "${SONARR_API_KEY:?set in .env}"
       SONARR_QUALITY_PROFILE_ID: "${SONARR_QUALITY_PROFILE_ID:?set in .env}"
       SONARR_ROOT_FOLDER: "${SONARR_ROOT_FOLDER:?set in .env}"
+      TRANSMISSION_RPC_URL: "${TRANSMISSION_RPC_URL:-http://transmission:9091/transmission/rpc}"
+      TRANSMISSION_USERNAME: "${TRANSMISSION_USERNAME:?set in .env}"
+      TRANSMISSION_PASSWORD: "${TRANSMISSION_PASSWORD:?set in .env}"
+      TRANSMISSION_ALLOWED_DOWNLOAD_DIRS: "${TRANSMISSION_ALLOWED_DOWNLOAD_DIRS:-/downloads/complete}"
     networks: [media]
 networks:
   media:

@@ -13,9 +13,9 @@
 
     <groupId>com.cineseekerr</groupId>
     <artifactId>cineseekerr</artifactId>
-    <version>1.1.1</version>
+    <version>1.2.0</version>
     <name>cineseekerr</name>
-    <description>Telegram bot to search and download movies via Prowlarr and qBittorrent</description>
+    <description>Telegram bot for Arr manual releases and confirmed Transmission cleanup</description>
 
     <properties>
         <java.version>21</java.version>
@@ -27,7 +27,7 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter</artifactId>
         </dependency>
-        <!-- RestClient + Jackson for the TMDB/Prowlarr/qBittorrent HTTP clients -->
+        <!-- RestClient + Jackson for TMDB, Arr and Transmission HTTP clients -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-json</artifactId>

@@ -2,12 +2,13 @@ package com.cineseekerr.bot.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
+import java.util.List;
 import java.util.Set;
 
 /** Typed configuration for the Telegram, TMDB and *arr services. */
 @ConfigurationProperties(prefix = "cineseekerr")
 public record CineSeekerrProperties(Telegram telegram, Tmdb tmdb, Radarr radarr, Sonarr sonarr,
-                                    String language) {
+                                    Transmission transmission, String language) {
     public CineSeekerrProperties {
         if (language == null || language.isBlank()) language = "en";
         if (tmdb != null && (tmdb.language() == null || tmdb.language().isBlank())) {
@@ -24,4 +25,11 @@ public record CineSeekerrProperties(Telegram telegram, Tmdb tmdb, Radarr radarr,
     public record Radarr(String baseUrl, String apiKey, Integer qualityProfileId, String rootFolder) { }
     /** Sonarr must already have a download client and import/rename policy configured. */
     public record Sonarr(String baseUrl, String apiKey, Integer qualityProfileId, String rootFolder) { }
+    /** Credentials are used only by the confirmed completed-torrent cleanup commands. */
+    public record Transmission(String rpcUrl, String username, String password,
+                               List<String> allowedDownloadDirs) {
+        public Transmission {
+            allowedDownloadDirs = allowedDownloadDirs == null ? List.of() : List.copyOf(allowedDownloadDirs);
+        }
+    }
 }

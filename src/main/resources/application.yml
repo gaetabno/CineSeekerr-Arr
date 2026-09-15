@@ -27,6 +27,11 @@ cineseekerr:
     api-key: ${SONARR_API_KEY:}
     quality-profile-id: ${SONARR_QUALITY_PROFILE_ID:}
     root-folder: ${SONARR_ROOT_FOLDER:}
+  transmission:
+    rpc-url: ${TRANSMISSION_RPC_URL:http://transmission:9091/transmission/rpc}
+    username: ${TRANSMISSION_USERNAME:}
+    password: ${TRANSMISSION_PASSWORD:}
+    allowed-download-dirs: ${TRANSMISSION_ALLOWED_DOWNLOAD_DIRS:/downloads/complete}
 logging:
   level:
     com.cineseekerr.bot: INFO

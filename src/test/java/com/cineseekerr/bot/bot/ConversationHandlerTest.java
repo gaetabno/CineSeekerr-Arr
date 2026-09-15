@@ -25,6 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class ConversationHandlerTest {
@@ -33,6 +34,7 @@ class ConversationHandlerTest {
 
     private InMemoryConversationStateStore store;
     private ConversationHandler handler;
+    private TorrentCleanupHandler cleanup;
 
     @BeforeEach
     void setUp() {
@@ -42,9 +44,10 @@ class ConversationHandlerTest {
         when(formatter.stepHeader(any())).thenReturn("hdr ");
         when(formatter.shortlistText(any())).thenReturn("shortlist");
         store = new InMemoryConversationStateStore();
+        cleanup = mock(TorrentCleanupHandler.class);
         handler = new ConversationHandler(mock(TmdbClient.class), mock(RadarrClient.class),
                 mock(SonarrClient.class), mock(ReleaseNameParser.class),
-                mock(TelegramMessenger.class), store, messages, formatter);
+                mock(TelegramMessenger.class), store, messages, formatter, cleanup);
     }
 
     @Test
@@ -52,6 +55,15 @@ class ConversationHandlerTest {
         assertThat(ConversationHandler.callbackValue(Resolution.R1080P)).isEqualTo("R1080P");
         assertThat(ConversationHandler.callbackValue(Resolution.R2160P)).isEqualTo("R2160P");
         assertThat(ConversationHandler.callbackValue(VideoCodec.X265)).isEqualTo("X265");
+    }
+
+    @Test
+    void dispatchesClearAndEliminaToDistinctSafeCleanupModes() {
+        handler.onTextMessage(CHAT, "/clear");
+        handler.onTextMessage(CHAT, "/elimina");
+
+        verify(cleanup).preview(CHAT, CHAT, CleanupMode.CLEAR);
+        verify(cleanup).preview(CHAT, CHAT, CleanupMode.DELETE_DATA);
     }
 
     /** Regression: "Qualsiasi" on a step after a previous "Qualsiasi" must advance, not loop. */
