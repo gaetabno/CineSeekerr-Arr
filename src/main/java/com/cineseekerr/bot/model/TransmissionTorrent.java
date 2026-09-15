@@ -26,6 +26,23 @@ public record TransmissionTorrent(
                 && status != null && COMPLETED_STATES.contains(status);
     }
 
+    /** A real Transmission payload that may be selected for explicit data deletion. */
+    public boolean isRemovable() {
+        return hashString != null && !hashString.isBlank()
+                && totalSizeOrZero() > 0
+                && percentDone != null && percentDone >= 0.0 && percentDone <= 1.0
+                && status != null && status >= 0 && status <= 6;
+    }
+
+    public boolean isIncomplete() {
+        return percentDone != null && percentDone < 1.0;
+    }
+
+    public int progressPercent() {
+        if (percentDone == null) return 0;
+        return (int) Math.round(Math.max(0.0, Math.min(1.0, percentDone)) * 100.0);
+    }
+
     public long totalSizeOrZero() {
         return totalSize == null ? 0 : Math.max(0, totalSize);
     }

@@ -24,7 +24,7 @@ import static com.cineseekerr.bot.bot.MessageFormatter.esc;
 import static com.cineseekerr.bot.bot.MessageFormatter.humanSize;
 import static com.cineseekerr.bot.bot.MessageFormatter.truncate;
 
-/** Chat-scoped selection and confirmation flow for completed Transmission torrents. */
+/** Chat-scoped selection and confirmation flow for Transmission torrents. */
 @Component
 public class TorrentCleanupHandler {
     private static final Duration CONFIRMATION_TTL = Duration.ofMinutes(10);
@@ -163,10 +163,14 @@ public class TorrentCleanupHandler {
             return true;
         }
 
-        String text = messages.get("cleanup.preview.delete.one",
-                esc(truncate(selected.name(), 120)), humanSize(selected.totalSizeOrZero()));
+        String previewKey = selected.isIncomplete()
+                ? "cleanup.preview.delete.one.incomplete" : "cleanup.preview.delete.one";
+        String text = messages.get(previewKey, esc(truncate(selected.name(), 120)),
+                humanSize(selected.totalSizeOrZero()), selected.progressPercent());
+        String confirmButtonKey = selected.isIncomplete()
+                ? "cleanup.confirm.delete.incomplete.button" : "cleanup.confirm.delete.button";
         InlineKeyboardMarkup markup = keyboard(List.of(
-                new InlineKeyboardRow(button(messages.get("cleanup.confirm.delete.button"),
+                new InlineKeyboardRow(button(messages.get(confirmButtonKey),
                         CALLBACK_PREFIX + "confirm:" + CleanupMode.DELETE_DATA.callbackValue())),
                 new InlineKeyboardRow(button(messages.get("cancel.button"), CALLBACK_PREFIX + "cancel"))));
         messenger.editHtml(chatId, messageId, text, markup);
@@ -177,7 +181,7 @@ public class TorrentCleanupHandler {
         Set<String> hashes = request.torrents().stream().map(TransmissionTorrent::hashString)
                 .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
         try {
-            List<TransmissionTorrent> removed = transmission.removeCompleted(Set.copyOf(hashes), request.mode().deleteData());
+            List<TransmissionTorrent> removed = transmission.removeEligible(Set.copyOf(hashes), request.mode().deleteData());
             if (removed.isEmpty()) {
                 messenger.editHtml(chatId, messageId, messages.get("cleanup.none.remaining"), null);
             } else {
@@ -215,7 +219,9 @@ public class TorrentCleanupHandler {
         List<InlineKeyboardRow> rows = new ArrayList<>();
         for (int index = start; index < end; index++) {
             TransmissionTorrent torrent = torrents.get(index);
-            String label = "🗑 " + truncate(torrent.name(), 45) + " (" + humanSize(torrent.totalSizeOrZero()) + ")";
+            String state = torrent.isIncomplete() ? "🟠 " : "✅ ";
+            String label = state + torrent.progressPercent() + "% · " + truncate(torrent.name(), 38)
+                    + " (" + humanSize(torrent.totalSizeOrZero()) + ")";
             rows.add(new InlineKeyboardRow(button(label, CALLBACK_PREFIX + "select:" + index)));
         }
         List<InlineKeyboardButton> navigation = new ArrayList<>();

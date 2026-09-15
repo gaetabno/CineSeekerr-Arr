@@ -17,7 +17,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
-/** Narrow Transmission RPC client used only for confirmed cleanup of completed torrents. */
+/** Narrow Transmission RPC client used only for explicitly confirmed torrent cleanup. */
 @Component
 public class TransmissionClient {
     private static final String SESSION_HEADER = "X-Transmission-Session-Id";
@@ -48,7 +48,7 @@ public class TransmissionClient {
         this.client = builder.defaultHeaders(headers -> headers.setBasicAuth(username, password)).build();
     }
 
-    /** Returns completed positive-size torrents; data deletion also requires an allowlisted path. */
+    /** `/clear` sees only completed torrents; explicit data deletion may also select incomplete ones. */
     public List<TransmissionTorrent> cleanupCandidates(boolean deleteData) {
         TransmissionResponse response = rpc(Map.of(
                 "method", "torrent-get",
@@ -56,16 +56,16 @@ public class TransmissionClient {
         List<TransmissionTorrent> torrents = response.arguments() == null
                 ? List.of() : response.arguments().torrentsOrEmpty();
         return torrents.stream()
-                .filter(TransmissionTorrent::isCompleted)
+                .filter(torrent -> deleteData ? torrent.isRemovable() : torrent.isCompleted())
                 .filter(torrent -> !deleteData || torrent.isUnderAnyDownloadRoot(allowedDownloadRoots))
                 .toList();
     }
 
     /**
      * Re-reads Transmission and removes only hashes that are both in the preview snapshot and
-     * still eligible. This prevents active, moved, or newly arrived torrents from being swept.
+     * still eligible for the requested mode. This prevents moved or newly arrived torrents from being swept.
      */
-    public List<TransmissionTorrent> removeCompleted(Set<String> snapshotHashes, boolean deleteData) {
+    public List<TransmissionTorrent> removeEligible(Set<String> snapshotHashes, boolean deleteData) {
         if (snapshotHashes == null || snapshotHashes.isEmpty()) return List.of();
         List<TransmissionTorrent> eligible = cleanupCandidates(deleteData).stream()
                 .filter(torrent -> snapshotHashes.contains(torrent.hashString()))

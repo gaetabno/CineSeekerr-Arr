@@ -51,6 +51,58 @@ class TransmissionClientTest {
     }
 
     @Test
+    void eliminaCandidatesIncludeIncompleteTorrentsInsideAllowedDownloadRoots() {
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        TransmissionClient client = new TransmissionClient(builder, settings());
+
+        server.expect(requestTo("http://transmission:9091/transmission/rpc"))
+                .andRespond(withSuccess("""
+                        {"arguments":{"torrents":[
+                          {"hashString":"PARTIAL","name":"Partial","status":4,"percentDone":0.943,
+                           "totalSize":2147483648,"downloadDir":"/downloads/complete/tv-sonarr"},
+                          {"hashString":"DONE","name":"Completed","status":6,"percentDone":1.0,
+                           "totalSize":1073741824,"downloadDir":"/downloads/complete/movies"},
+                          {"hashString":"OUTSIDE","name":"Outside","status":4,"percentDone":0.5,
+                           "totalSize":100,"downloadDir":"/Media/Movies"},
+                          {"hashString":"EMPTY","name":"Empty","status":4,"percentDone":0.5,
+                           "totalSize":0,"downloadDir":"/downloads/complete"}
+                        ]},"result":"success"}
+                        """, MediaType.APPLICATION_JSON));
+
+        List<TransmissionTorrent> candidates = client.cleanupCandidates(true);
+
+        assertThat(candidates).extracting(TransmissionTorrent::hashString)
+                .containsExactly("PARTIAL", "DONE");
+        server.verify();
+    }
+
+    @Test
+    void eliminaRevalidatesAndCanRemoveASelectedIncompleteTorrent() {
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        TransmissionClient client = new TransmissionClient(builder, settings());
+
+        server.expect(requestTo("http://transmission:9091/transmission/rpc"))
+                .andRespond(withSuccess("""
+                        {"arguments":{"torrents":[
+                          {"hashString":"PARTIAL","name":"Partial","status":4,"percentDone":0.943,
+                           "totalSize":2147483648,"downloadDir":"/downloads/complete/tv-sonarr"}
+                        ]},"result":"success"}
+                        """, MediaType.APPLICATION_JSON));
+        server.expect(requestTo("http://transmission:9091/transmission/rpc"))
+                .andExpect(jsonPath("$.method").value("torrent-remove"))
+                .andExpect(jsonPath("$.arguments.ids[0]").value("PARTIAL"))
+                .andExpect(jsonPath("$.arguments['delete-local-data']").value(true))
+                .andRespond(withSuccess("{\"arguments\":{},\"result\":\"success\"}", MediaType.APPLICATION_JSON));
+
+        List<TransmissionTorrent> removed = client.removeEligible(Set.of("PARTIAL"), true);
+
+        assertThat(removed).extracting(TransmissionTorrent::hashString).containsExactly("PARTIAL");
+        server.verify();
+    }
+
+    @Test
     void revalidatesSnapshotAndKeepsDataForClear() {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
@@ -65,7 +117,7 @@ class TransmissionClientTest {
                 .andExpect(jsonPath("$.arguments['delete-local-data']").value(false))
                 .andRespond(withSuccess("{\"arguments\":{},\"result\":\"success\"}", MediaType.APPLICATION_JSON));
 
-        List<TransmissionTorrent> removed = client.removeCompleted(Set.of("DONE", "NO_LONGER_PRESENT"), false);
+        List<TransmissionTorrent> removed = client.removeEligible(Set.of("DONE", "NO_LONGER_PRESENT"), false);
 
         assertThat(removed).extracting(TransmissionTorrent::hashString).containsExactly("DONE");
         server.verify();
@@ -83,7 +135,7 @@ class TransmissionClientTest {
                 .andExpect(jsonPath("$.arguments['delete-local-data']").value(true))
                 .andRespond(withSuccess("{\"arguments\":{},\"result\":\"success\"}", MediaType.APPLICATION_JSON));
 
-        client.removeCompleted(Set.of("DONE"), true);
+        client.removeEligible(Set.of("DONE"), true);
 
         server.verify();
     }
@@ -104,7 +156,7 @@ class TransmissionClientTest {
                         ]},"result":"success"}
                         """, MediaType.APPLICATION_JSON));
 
-        List<TransmissionTorrent> removed = client.removeCompleted(
+        List<TransmissionTorrent> removed = client.removeEligible(
                 Set.of("LIBRARY", "TRAVERSAL"), true);
 
         assertThat(removed).isEmpty();

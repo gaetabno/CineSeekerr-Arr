@@ -41,7 +41,7 @@ class TorrentCleanupHandlerTest {
 
         handler.preview(1L, CleanupMode.CLEAR);
 
-        verify(transmission, never()).removeCompleted(anySet(), anyBoolean());
+        verify(transmission, never()).removeEligible(anySet(), anyBoolean());
         ArgumentCaptor<InlineKeyboardMarkup> keyboard = ArgumentCaptor.forClass(InlineKeyboardMarkup.class);
         verify(messenger).sendHtml(eq(1L), anyString(), keyboard.capture());
         assertThat(callbacks(keyboard.getValue())).contains("cleanup:confirm:clear", "cleanup:cancel");
@@ -50,13 +50,13 @@ class TorrentCleanupHandlerTest {
     @Test
     void clearConfirmationRemovesAllSnapshotHashesAndKeepsDownloadedData() {
         when(transmission.cleanupCandidates(false)).thenReturn(completed());
-        when(transmission.removeCompleted(anySet(), eq(false))).thenReturn(completed());
+        when(transmission.removeEligible(anySet(), eq(false))).thenReturn(completed());
         handler.preview(1L, CleanupMode.CLEAR);
 
         boolean handled = handler.onCallback(1L, 42, "cleanup:confirm:clear");
 
         assertThat(handled).isTrue();
-        verify(transmission).removeCompleted(Set.of("HASH-A", "HASH-B"), false);
+        verify(transmission).removeEligible(Set.of("HASH-A", "HASH-B"), false);
     }
 
     @Test
@@ -70,17 +70,44 @@ class TorrentCleanupHandlerTest {
         assertThat(callbacks(keyboard.getValue()))
                 .contains("cleanup:select:0", "cleanup:select:1", "cleanup:cancel")
                 .doesNotContain("cleanup:confirm:delete");
-        verify(transmission, never()).removeCompleted(anySet(), anyBoolean());
+        verify(transmission, never()).removeEligible(anySet(), anyBoolean());
+    }
+
+    @Test
+    void eliminaShowsIncompleteTorrentWithProgressAndRequiresSeparateConfirmation() {
+        TransmissionTorrent partial = new TransmissionTorrent("PARTIAL", "Series downloading", 4,
+                0.943, 2L << 30, "/downloads/complete/tv-sonarr");
+        when(transmission.cleanupCandidates(true)).thenReturn(List.of(partial));
+        when(transmission.removeEligible(Set.of("PARTIAL"), true)).thenReturn(List.of(partial));
+
+        handler.preview(1L, CleanupMode.DELETE_DATA);
+
+        ArgumentCaptor<InlineKeyboardMarkup> selection = ArgumentCaptor.forClass(InlineKeyboardMarkup.class);
+        verify(messenger).sendHtml(eq(1L), anyString(), selection.capture());
+        assertThat(buttonTexts(selection.getValue())).anyMatch(text -> text.contains("94%"));
+        verify(transmission, never()).removeEligible(anySet(), anyBoolean());
+
+        handler.onCallback(1L, 42, "cleanup:select:0");
+        ArgumentCaptor<String> warning = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<InlineKeyboardMarkup> confirmation = ArgumentCaptor.forClass(InlineKeyboardMarkup.class);
+        verify(messenger).editHtml(eq(1L), eq(42), warning.capture(), confirmation.capture());
+        assertThat(warning.getValue()).isEqualTo("cleanup.preview.delete.one.incomplete");
+        assertThat(buttonTexts(confirmation.getValue()))
+                .contains("cleanup.confirm.delete.incomplete.button");
+        verify(transmission, never()).removeEligible(anySet(), anyBoolean());
+        handler.onCallback(1L, 42, "cleanup:confirm:delete");
+
+        verify(transmission).removeEligible(Set.of("PARTIAL"), true);
     }
 
     @Test
     void eliminaDeletesOnlyTheSelectedResourceAfterSeparateConfirmation() {
         when(transmission.cleanupCandidates(true)).thenReturn(completed());
-        when(transmission.removeCompleted(Set.of("HASH-B"), true)).thenReturn(List.of(completed().get(1)));
+        when(transmission.removeEligible(Set.of("HASH-B"), true)).thenReturn(List.of(completed().get(1)));
         handler.preview(1L, CleanupMode.DELETE_DATA);
 
         handler.onCallback(1L, 42, "cleanup:select:1");
-        verify(transmission, never()).removeCompleted(anySet(), anyBoolean());
+        verify(transmission, never()).removeEligible(anySet(), anyBoolean());
 
         ArgumentCaptor<InlineKeyboardMarkup> keyboard = ArgumentCaptor.forClass(InlineKeyboardMarkup.class);
         verify(messenger).editHtml(eq(1L), eq(42), anyString(), keyboard.capture());
@@ -88,7 +115,7 @@ class TorrentCleanupHandlerTest {
 
         handler.onCallback(1L, 42, "cleanup:confirm:delete");
 
-        verify(transmission).removeCompleted(Set.of("HASH-B"), true);
+        verify(transmission).removeEligible(Set.of("HASH-B"), true);
     }
 
     @Test
@@ -99,7 +126,7 @@ class TorrentCleanupHandlerTest {
         handler.onCallback(1L, 42, "cleanup:select:99");
         handler.onCallback(1L, 42, "cleanup:confirm:delete");
 
-        verify(transmission, never()).removeCompleted(anySet(), anyBoolean());
+        verify(transmission, never()).removeEligible(anySet(), anyBoolean());
     }
 
     @Test
@@ -109,7 +136,7 @@ class TorrentCleanupHandlerTest {
 
         handler.onCallback(1L, 42, "cleanup:confirm:clear");
 
-        verify(transmission, never()).removeCompleted(anySet(), anyBoolean());
+        verify(transmission, never()).removeEligible(anySet(), anyBoolean());
     }
 
     @Test
@@ -120,7 +147,7 @@ class TorrentCleanupHandlerTest {
         handler.onCallback(1L, 42, "cleanup:cancel");
         handler.onCallback(1L, 42, "cleanup:select:0");
 
-        verify(transmission, never()).removeCompleted(anySet(), anyBoolean());
+        verify(transmission, never()).removeEligible(anySet(), anyBoolean());
     }
 
     @Test
@@ -131,14 +158,14 @@ class TorrentCleanupHandlerTest {
         handler.cancelPending(1L);
         handler.onCallback(1L, 42, "cleanup:select:0");
 
-        verify(transmission, never()).removeCompleted(anySet(), anyBoolean());
+        verify(transmission, never()).removeEligible(anySet(), anyBoolean());
     }
 
     @Test
     void cancelOnOldPreviewDoesNotInvalidateNewerPreview() {
         when(transmission.cleanupCandidates(true)).thenReturn(completed());
         when(messenger.sendHtml(anyLong(), anyString(), any())).thenReturn(41, 42);
-        when(transmission.removeCompleted(Set.of("HASH-A"), true)).thenReturn(List.of(completed().getFirst()));
+        when(transmission.removeEligible(Set.of("HASH-A"), true)).thenReturn(List.of(completed().getFirst()));
         handler.preview(1L, CleanupMode.DELETE_DATA);
         handler.preview(1L, CleanupMode.DELETE_DATA);
 
@@ -146,27 +173,27 @@ class TorrentCleanupHandlerTest {
         handler.onCallback(1L, 42, "cleanup:select:0");
         handler.onCallback(1L, 42, "cleanup:confirm:delete");
 
-        verify(transmission).removeCompleted(Set.of("HASH-A"), true);
+        verify(transmission).removeEligible(Set.of("HASH-A"), true);
     }
 
     @Test
     void doubleConfirmationCanRemoveSelectedResourceOnlyOnce() {
         when(transmission.cleanupCandidates(true)).thenReturn(completed());
-        when(transmission.removeCompleted(Set.of("HASH-A"), true)).thenReturn(List.of(completed().getFirst()));
+        when(transmission.removeEligible(Set.of("HASH-A"), true)).thenReturn(List.of(completed().getFirst()));
         handler.preview(1L, CleanupMode.DELETE_DATA);
         handler.onCallback(1L, 42, "cleanup:select:0");
 
         handler.onCallback(1L, 42, "cleanup:confirm:delete");
         handler.onCallback(1L, 42, "cleanup:confirm:delete");
 
-        verify(transmission, times(1)).removeCompleted(Set.of("HASH-A"), true);
+        verify(transmission, times(1)).removeEligible(Set.of("HASH-A"), true);
     }
 
     @Test
     void paginatesDeleteCandidatesAndSelectsFromTheRequestedPage() {
         List<TransmissionTorrent> torrents = manyCompleted(10);
         when(transmission.cleanupCandidates(true)).thenReturn(torrents);
-        when(transmission.removeCompleted(Set.of("HASH-9"), true)).thenReturn(List.of(torrents.get(9)));
+        when(transmission.removeEligible(Set.of("HASH-9"), true)).thenReturn(List.of(torrents.get(9)));
         handler.preview(1L, CleanupMode.DELETE_DATA);
 
         ArgumentCaptor<InlineKeyboardMarkup> firstPage = ArgumentCaptor.forClass(InlineKeyboardMarkup.class);
@@ -179,7 +206,7 @@ class TorrentCleanupHandlerTest {
         handler.onCallback(1L, 42, "cleanup:select:9");
         handler.onCallback(1L, 42, "cleanup:confirm:delete");
 
-        verify(transmission).removeCompleted(Set.of("HASH-9"), true);
+        verify(transmission).removeEligible(Set.of("HASH-9"), true);
     }
 
     @Test
@@ -205,7 +232,7 @@ class TorrentCleanupHandlerTest {
         handler.onCallback(-100L, 222L, 42, "cleanup:select:0");
         handler.onCallback(-100L, 222L, 42, "cleanup:confirm:delete");
 
-        verify(transmission, never()).removeCompleted(anySet(), anyBoolean());
+        verify(transmission, never()).removeEligible(anySet(), anyBoolean());
         verify(messenger, never()).editHtml(eq(-100L), eq(42), anyString(), any());
     }
 
@@ -228,6 +255,13 @@ class TorrentCleanupHandlerTest {
         return markup.getKeyboard().stream()
                 .flatMap(row -> row.stream())
                 .map(button -> button.getCallbackData())
+                .toList();
+    }
+
+    private static List<String> buttonTexts(InlineKeyboardMarkup markup) {
+        return markup.getKeyboard().stream()
+                .flatMap(row -> row.stream())
+                .map(button -> button.getText())
                 .toList();
     }
 }
