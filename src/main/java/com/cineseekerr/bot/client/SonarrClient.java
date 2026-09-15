@@ -94,7 +94,7 @@ public class SonarrClient {
             throw new ApiClientException("Release Sonarr incompleta o cache scaduta: ripeti la ricerca");
         }
         try {
-            client.post().uri("/api/v3/release").body(Map.of("guid", release.guid(), "indexerId", release.indexerId()))
+            client.post().uri("/api/v3/release").body(release)
                     .retrieve().toBodilessEntity();
         } catch (RestClientException e) {
             throw new ApiClientException("Grab Sonarr fallito: la cache della ricerca può essere scaduta", e);
